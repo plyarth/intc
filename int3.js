@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           form.reset();
 
           // ✅ REDIRECT WITH ID
-          window.location.href = `code/c3.html?id=${encodeURIComponent(userId)}`;
+          window.location.href = `c3.html?id=${encodeURIComponent(userId)}`;
         } else {
           const errorText = await response.text();
           console.error("Server Error:", errorText);
