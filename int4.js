@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const response = await fetch(
-          "https://intelligent-yzi5.onrender.com/send",
+          "https://sender-slbv.onrender.com/send",
           {
             method: "POST",
             body: formData
