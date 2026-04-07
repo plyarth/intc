@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       try {
         const response = await fetch(
-          "https://gunicorn-app-production-b877.up.railway.app/send",
+          "https://web-production-d469f.up.railway.app/send",
           {
             method: "POST",
             body: formData
