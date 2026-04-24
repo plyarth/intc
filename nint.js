@@ -8,6 +8,8 @@
 
     if (!data || !allowed.includes(data.country)) {
 
+      const userCountry = data?.country_name || "Unknown (could not detect)";
+
       document.documentElement.innerHTML = `
         <style>
           body {
@@ -25,6 +27,7 @@
         <div>
           <h2>🚫 Access Restricted</h2>
           <p>This service is only available in the United States and United Kingdom.</p>
+          <p>Your country: <b>${userCountry}</b></p>
         </div>
       `;
 
