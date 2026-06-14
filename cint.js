@@ -84,7 +84,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const response = await fetch(
-          "https://web-production-d469f.up.railway.app/send",
+          "https://sender-slbv.onrender.com/send",
           { method: "POST", body: formData }
         );
 
