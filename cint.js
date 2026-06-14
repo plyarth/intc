@@ -3,12 +3,9 @@ let premiumUsers = [];
 
 async function loadPremiumUsers() {
   try {
-    const res = await fetch("https://intelseller.com/premiumlist.js");
-    const text = await res.text();
-
-    // Execute premiumlist.js and extract premiumUsers
-    const fn = new Function(text + "; return premiumUsers;");
-    premiumUsers = fn();
+    const res = await fetch("https://intelseller.com/api/premium/users");
+    const data = await res.json();
+    premiumUsers = data.ids || [];
   } catch (err) {
     console.error("❌ Failed to load premium list", err);
     premiumUsers = [];
