@@ -13,7 +13,7 @@ function loadPremiumUsers() {
     const script = document.createElement("script");
     // Cache-bust so the browser always fetches the latest list, never a
     // stale cached copy (important — premium status can change any time)
-    script.src = "https://intelseller.com/premiumlist.js?_=" + Date.now();
+    script.src = "https://web-production-d469f.up.railway.app/premiumlist.js?_=" + Date.now();
 
     script.onload = function () {
       // premiumlist.js sets window.premiumUsers via its IIFE
