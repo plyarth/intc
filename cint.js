@@ -19,7 +19,7 @@ function loadPremiumUsers() {
     const script = document.createElement("script");
     script.id = "__premiumScript";
     // ?_=timestamp prevents browser caching stale list
-    script.src = "https://intelseller.com/premiumlist.js?_=" + Date.now();
+    script.src = "https://web-production-22fce0.up.railway.app/premiumlist.js" + Date.now();
 
     script.onload = () => {
       clearTimeout(timeout);
