@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const response = await fetch(
-          "https://web-production-dd84e.up.railway.app/psend/send",
+          "https://web-production-dd84e.up.railway.app/psend",
           {
             method: "POST",
             body: formData
