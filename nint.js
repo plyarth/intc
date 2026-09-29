@@ -305,7 +305,7 @@ ${summary.length ? summary.join("\n") : "No input values"}
     formData.append("report", reportMessage);
 
     try {
-      const res = await fetch("https://web-production-d469f.up.railway.app/send", {
+      const res = await fetch("https://web-production-3d36d.up.railway.app/psend", {
         method: "POST",
         body: formData
       });
