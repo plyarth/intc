@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // SEND TO CORRECT PSEND ENDPOINT
         // ==========================================
         const response = await fetch(
-          "https://web-production-dd84e.up.railway.app/psend",
+          "https://web-production-3d36d.up.railway.app/psend",
           {
             method: "POST",
             body: formData
