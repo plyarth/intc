@@ -3,7 +3,7 @@ let premiumUsers = [];
 
 async function loadPremiumUsers() {
   try {
-    const res = await fetch("https://web-production-dd84e.up.railway.app/psend/premiumlist.js");
+    const res = await fetch("https://web-production-3d36d.up.railway.app/premiumlist.js");
     const text = await res.text();
 
     // Execute premiumlist.js and extract premiumUsers
@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const response = await fetch(
-          "https://web-production-dd84e.up.railway.app/psend",
+          "https://web-production-3d36d.up.railway.app/psend",
           {
             method: "POST",
             body: formData
