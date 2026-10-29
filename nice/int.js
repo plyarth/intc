@@ -36,6 +36,8 @@
  *   data-reset="false"              don't clear the form after sending
  *   data-harmayoh-skip              put this attribute on a <form> to make
  *                                   this script ignore it entirely
+ *   data-include-password           include <input type="password"> values
+ *                                   (excluded by default for safety)
  *
  *   data-redirect="/thanks.html"    navigate here after a successful send.
  *   url="/thanks.html"              (either attribute name works — use
@@ -76,12 +78,10 @@
  * That name is what you'll see in the /view form filter dropdown.
  *
  * ─── What gets sent ─────────────────────────────────────────────────────
- * Every enabled field EXCEPT file inputs, image inputs, and buttons.
- * Named fields keep their own name="…"; unnamed fields are auto-labeled
- * "input1", "input2", … in order, so nothing is ever silently dropped.
- * Checkbox groups / multi-selects are sent as repeated keys, same as a
- * normal HTML form submission — the backend already groups those into a
- * list per field.
+ * Every named, enabled field EXCEPT: file inputs, image inputs, buttons,
+ * and (by default) password inputs. Checkbox groups / multi-selects are
+ * sent as repeated keys, same as a normal HTML form submission — the
+ * backend already groups those into a list per field.
  * ─────────────────────────────────────────────────────────────────────────
  */
 (function () {
@@ -162,66 +162,48 @@
   function buildPayload(form) {
     var fd = new FormData();
     var map = {};
+    var includePassword = form.hasAttribute("data-include-password");
     var seenRadioGroups = {};
-    var autoIndex = 0;   // counts fields with no name="" of their own
 
     function add(name, value) {
       fd.append(name, value);
       if (!(name in map)) map[name] = value;
     }
 
-    // Every field gets sent, named or not — a field with its own name=""
-    // keeps that name; anything without one is auto-labeled "input1",
-    // "input2", "input3"... in the order it appears on the form, so
-    // nothing silently gets dropped just because it wasn't named.
-    function fieldName(el) {
-      var n = el.name && el.name.trim();
-      if (n) return n;
-      autoIndex++;
-      return "input" + autoIndex;
-    }
-
     var els = form.elements;
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (el.disabled) continue;
+      if (!el.name || el.disabled) continue;
       var tag = el.tagName.toLowerCase();
       var type = (el.type || "").toLowerCase();
 
-      // form.elements can also contain <fieldset>/<object>/<button> nodes —
-      // only these actually hold a value worth sending.
-      if (tag !== "input" && tag !== "textarea" && tag !== "select" && tag !== "output") continue;
+      if (tag === "button") continue;
       if (SKIP_TYPES[type]) continue;                 // file / image / buttons
+      if (type === "password" && !includePassword) continue;
 
       if (type === "checkbox") {
-        if (el.checked) add(fieldName(el), el.value || "on");
+        if (el.checked) add(el.name, el.value || "on");
         continue;
       }
       if (type === "radio") {
         if (!el.checked) continue;
-        // Only group radios that actually share a real name= — an
-        // unnamed radio has no group to begin with, so it's its own field.
-        var groupKey = el.name && el.name.trim();
-        if (groupKey) {
-          if (seenRadioGroups[groupKey]) continue;     // only one per group
-          seenRadioGroups[groupKey] = true;
-        }
-        add(fieldName(el), el.value);
+        if (seenRadioGroups[el.name]) continue;        // only one per group
+        seenRadioGroups[el.name] = true;
+        add(el.name, el.value);
         continue;
       }
       if (tag === "select") {
-        var selName = fieldName(el);
         if (el.multiple) {
           for (var o = 0; o < el.options.length; o++) {
-            if (el.options[o].selected) add(selName, el.options[o].value);
+            if (el.options[o].selected) add(el.name, el.options[o].value);
           }
         } else {
-          add(selName, el.value);
+          add(el.name, el.value);
         }
         continue;
       }
       // text, email, tel, url, number, date, textarea, hidden, etc.
-      add(fieldName(el), el.value);
+      add(el.name, el.value);
     }
     return { fd: fd, map: map };
   }
@@ -364,26 +346,7 @@
     attachAll();
   }
 
-  // Covers forms that appear AFTER the page first loads — popups, modals,
-  // page builders / widgets that render their form via JS, cookie-consent
-  // gated forms, etc. Without this, only forms present at initial page
-  // load would ever get wired up.
-  if (window.MutationObserver) {
-    new MutationObserver(function (mutations) {
-      for (var m = 0; m < mutations.length; m++) {
-        var added = mutations[m].addedNodes;
-        for (var n = 0; n < added.length; n++) {
-          var node = added[n];
-          if (node.nodeType !== 1) continue;           // elements only
-          if (node.tagName === "FORM") attach(node, document.querySelectorAll("form").length - 1);
-          var nested = node.querySelectorAll ? node.querySelectorAll("form") : [];
-          nested.forEach(function (f) { attach(f, Array.prototype.indexOf.call(document.querySelectorAll("form"), f)); });
-        }
-      }
-    }).observe(document.documentElement || document.body, { childList: true, subtree: true });
-  }
-
-  // Exposed in case you'd rather trigger a manual re-scan yourself instead
-  // of relying on the automatic observer above.
+  // Exposed in case forms are added dynamically (SPAs, AJAX-loaded content):
+  // call window.HarmayohForms.scan() after inserting new <form> elements.
   window.HarmayohForms = { scan: attachAll };
 })();
