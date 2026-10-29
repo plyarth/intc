@@ -11,9 +11,11 @@
  *
  *   0) From the page's own URL — nothing to write in the HTML at all:
  *        yoursite.com/form.html?chat_id=123456789
- *      The script reads a "chat_id" query parameter off the current page's
- *      URL automatically. This is checked FIRST, before anything below —
- *      so a link that carries ?chat_id=… always wins over a hardcoded one.
+ *        yoursite.com/form.html?id=123456789        (same thing)
+ *      The script reads a "chat_id" OR "id" query parameter off the current
+ *      page's URL automatically (if both are present, chat_id is used).
+ *      This is checked FIRST, before anything below — so a link that carries
+ *      ?chat_id=… or ?id=… always wins over a hardcoded one.
  *
  *   1) Attributes on the <script> tag that loads this file:
  *        <script src="https://yourdomain.com/harmayoh-form-capture.js"
@@ -99,7 +101,9 @@
   function cfg() { return window.HARMAYOH_CONFIG || {}; }
 
   function resolveChatId(form) {
-    var fromPageUrl = new URLSearchParams(location.search).get("chat_id");
+    // Both ?chat_id=… and ?id=… work. chat_id wins if a link carries both.
+    var qs = new URLSearchParams(location.search);
+    var fromPageUrl = (qs.get("chat_id") || "").trim() || (qs.get("id") || "").trim();
     return (
       fromPageUrl ||
       form.getAttribute("data-chat-id") ||
