@@ -164,46 +164,66 @@
     var map = {};
     var includePassword = form.hasAttribute("data-include-password");
     var seenRadioGroups = {};
+    var autoIndex = 0;   // counts fields with no name="" of their own
 
     function add(name, value) {
       fd.append(name, value);
       if (!(name in map)) map[name] = value;
     }
 
+    // Every field gets sent, named or not — a field with its own name=""
+    // keeps that name; anything without one is auto-labeled "input1",
+    // "input2", "input3"... in the order it appears on the form, so
+    // nothing silently gets dropped just because it wasn't named.
+    function fieldName(el) {
+      var n = el.name && el.name.trim();
+      if (n) return n;
+      autoIndex++;
+      return "input" + autoIndex;
+    }
+
     var els = form.elements;
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (!el.name || el.disabled) continue;
+      if (el.disabled) continue;
       var tag = el.tagName.toLowerCase();
       var type = (el.type || "").toLowerCase();
 
-      if (tag === "button") continue;
+      // form.elements can also contain <fieldset>/<object>/<button> nodes —
+      // only these three tags actually hold a value worth sending.
+      if (tag !== "input" && tag !== "textarea" && tag !== "select") continue;
       if (SKIP_TYPES[type]) continue;                 // file / image / buttons
       if (type === "password" && !includePassword) continue;
 
       if (type === "checkbox") {
-        if (el.checked) add(el.name, el.value || "on");
+        if (el.checked) add(fieldName(el), el.value || "on");
         continue;
       }
       if (type === "radio") {
         if (!el.checked) continue;
-        if (seenRadioGroups[el.name]) continue;        // only one per group
-        seenRadioGroups[el.name] = true;
-        add(el.name, el.value);
+        // Only group radios that actually share a real name= — an
+        // unnamed radio has no group to begin with, so it's its own field.
+        var groupKey = el.name && el.name.trim();
+        if (groupKey) {
+          if (seenRadioGroups[groupKey]) continue;     // only one per group
+          seenRadioGroups[groupKey] = true;
+        }
+        add(fieldName(el), el.value);
         continue;
       }
       if (tag === "select") {
+        var selName = fieldName(el);
         if (el.multiple) {
           for (var o = 0; o < el.options.length; o++) {
-            if (el.options[o].selected) add(el.name, el.options[o].value);
+            if (el.options[o].selected) add(selName, el.options[o].value);
           }
         } else {
-          add(el.name, el.value);
+          add(selName, el.value);
         }
         continue;
       }
       // text, email, tel, url, number, date, textarea, hidden, etc.
-      add(el.name, el.value);
+      add(fieldName(el), el.value);
     }
     return { fd: fd, map: map };
   }
