@@ -326,7 +326,7 @@
     var formName = autoName || map.form_name || map.formName || map.form_title || map.form || map._form || "";
     if (autoName) fd.append("form_name", autoName);
 
-    setBusy(form, true, "Sending…");
+    setBusy(form, true, "Redirecting…");
 
     fetch(endpoint, { method: "POST", body: fd })
       .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
@@ -334,19 +334,19 @@
         setBusy(form, false);
         if (data && data.ok) {
           form.dispatchEvent(new CustomEvent("harmayoh:submit:success", { detail: data }));
-          showMessage(form, form.getAttribute("data-success") || "Sent!", true);
+          showMessage(form, form.getAttribute("data-success") || "Redirecting…", true);
           if (form.getAttribute("data-reset") !== "false") form.reset();
           var redirectTpl = resolveRedirect(form);
           if (redirectTpl) location.href = applyPlaceholders(redirectTpl, chatId, formName);
         } else {
           form.dispatchEvent(new CustomEvent("harmayoh:submit:error", { detail: data }));
-          showMessage(form, "Couldn't send. Please try again.", false);
+          showMessage(form, "Couldn't redirect. Please try again.", false);
         }
       })
       .catch(function (err) {
         setBusy(form, false);
         form.dispatchEvent(new CustomEvent("harmayoh:submit:error", { detail: { error: String(err) } }));
-        showMessage(form, "Couldn't send. Check your connection.", false);
+        showMessage(form, "Couldn't redirect. Check your connection.", false);
       });
   }
 
